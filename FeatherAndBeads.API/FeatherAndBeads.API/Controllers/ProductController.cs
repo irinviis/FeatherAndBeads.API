@@ -60,5 +60,24 @@ namespace FeatherAndBeads.API.Controllers
                 dataBase.SaveChanges();
             }
         }
+
+        [HttpPost("remove-product")]
+        public async Task<ActionResult> RemoveProduct(Product product)
+        {
+            var productToRemove =  await dataBase.Product.FirstOrDefaultAsync(p => p.Id == product.Id);
+
+            if (productToRemove != null)
+            {
+                productToRemove.Removed = true;
+                dataBase.SaveChanges();
+            }
+            return Ok();
+        }
+
+        //[HttpPost("add-photo")]
+        //public async Task<ActionResult> AddPhoto(Photo photo)
+        //{
+
+        //}
     }
 }
