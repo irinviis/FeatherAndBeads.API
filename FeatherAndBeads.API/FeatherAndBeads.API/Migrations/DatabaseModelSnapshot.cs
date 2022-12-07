@@ -33,6 +33,15 @@ namespace FeatherAndBeads.API.Migrations
                     b.Property<string>("CategoryName")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool?>("Disabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Link")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("Removed")
+                        .HasColumnType("bit");
+
                     b.HasKey("Id");
 
                     b.ToTable("Category");

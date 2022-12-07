@@ -21,6 +21,9 @@ namespace FeatherAndBeads.API.Models
 
         public bool Removed { get; set; }
 
+        [NotMapped] //Only for UI
+        public int CategoryId { get; set; }
+
         public IEnumerable<Photo>? Photos { get; set; }
 
 

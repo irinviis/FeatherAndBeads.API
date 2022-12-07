@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace FeatherAndBeads.API.Models
@@ -36,5 +37,13 @@ namespace FeatherAndBeads.API.Models
         public string? Mobile { get; set; }
 
         public bool Removed { get; set; }
+
+        public IdentityUser GetIdentity()
+        {
+            return new IdentityUser() {
+                UserName = $"{FirstName} {LastName}",
+                Email = Email
+            };
+        }
     }
 }

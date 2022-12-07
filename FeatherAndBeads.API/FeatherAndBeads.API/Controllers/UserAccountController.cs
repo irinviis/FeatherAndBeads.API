@@ -1,5 +1,6 @@
 ﻿using FeatherAndBeads.API.Interfaces;
 using FeatherAndBeads.API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,19 +11,31 @@ namespace FeatherAndBeads.API.Controllers
 {
     public class UserAccountController : BaseApiController
     {
-        private readonly Database database;
-        private readonly ITokenService tokenService;
+        private readonly Database _database;
+        private readonly ITokenService _tokenService;
+        private SignInManager<IdentityUser> _signInManager;
 
-        public UserAccountController(Database dBase, ITokenService tokenService)
+        public UserAccountController(Database database, ITokenService tokenService)
         {
-            database = dBase;
-            this.tokenService = tokenService;
+            _database = database;
+            _tokenService = tokenService;
+            //_signInManager = signInManager;
+        }
+
+        [Authorize]
+        [HttpGet("{userId}")]
+        public async Task<ActionResult> GetUser(int userId)
+        {
+            var user = await _database.User.FirstOrDefaultAsync(
+                u => u.Id == userId && u.Removed != true);
+
+            return Ok(user);
         }
 
         [HttpPost("register")]
         public async Task<ActionResult<User>> Register(User userModel)
         {
-            if(await database.User.AnyAsync(x => x.Email == userModel.Email))
+            if(await _database.User.AnyAsync(x => x.Email == userModel.Email))
             {
                 return BadRequest("Email is taken.");
             }
@@ -31,20 +44,20 @@ namespace FeatherAndBeads.API.Controllers
             userModel.PasswordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(userModel.Password));
             userModel.PasswordSalt = hmac.Key;
 
-            database.Add(userModel);
-            await database.SaveChangesAsync();
+            _database.Add(userModel);
+            await _database.SaveChangesAsync();
 
             return Ok(new User
             {
                 Email = userModel.Email,
-                Token = tokenService.CreateToken(userModel)
+                Token = _tokenService.CreateToken(userModel)
             });
         }
 
         [HttpPost("login")]
         public async Task<ActionResult<User>> Login(User userModel)
         {
-            var user = await database.User.FirstOrDefaultAsync(
+            var user = await _database.User.FirstOrDefaultAsync(
                 u => u.Email == userModel.Email && u.Removed != true);
 
             if(user != null)
@@ -59,11 +72,15 @@ namespace FeatherAndBeads.API.Controllers
                         return Unauthorized("Invalid username or password");
                     }
                 }
+
+                //await _signInManager.SignInAsync(user.GetIdentity(), true);
+
+
                 return new User
                 {
                     Id = user.Id,
                     Email = user.Email,
-                    Token = tokenService.CreateToken(user)
+                    Token = _tokenService.CreateToken(user)
                 };
             }
             else
@@ -72,10 +89,28 @@ namespace FeatherAndBeads.API.Controllers
             }
         }
 
+
+        [Authorize]
+        [HttpGet("getLoggedInUser")]
+        public ActionResult GetLoggedInUser()
+        {
+            var r = Request;
+            var p = _signInManager.UserManager;
+            return Ok("Na derzhi");
+        }
+
+        [Authorize]
+        [HttpGet("logout")]
+        public async Task<ActionResult> LogOut()
+        {
+            await _signInManager.SignOutAsync();
+            return Ok();
+        }
+
         [HttpPost("update-user")]
         public async Task UpdateUser(User updatedUser)
         {
-            var user = await database.User.FirstOrDefaultAsync(
+            var user = await _database.User.FirstOrDefaultAsync(
                 u => u.Id == updatedUser.Id);
             if (user != null)
             {
@@ -87,19 +122,19 @@ namespace FeatherAndBeads.API.Controllers
                 user.PostCode = updatedUser.PostCode;
                 user.City = updatedUser.City;
                 user.Country = updatedUser.Country;
-                database.SaveChanges();
+                _database.SaveChanges();
             }
         }
 
         [HttpPost("remove-user")]
         public async Task<ActionResult> RemoveUser(User user)
         {
-            var userToRemove = await database.User.FirstOrDefaultAsync(u => u.Id == user.Id);
+            var userToRemove = await _database.User.FirstOrDefaultAsync(u => u.Id == user.Id);
 
             if(userToRemove != null)
             {
                 userToRemove.Removed = true;
-                database.SaveChanges();
+                _database.SaveChanges();
             }
             return Ok();
         }

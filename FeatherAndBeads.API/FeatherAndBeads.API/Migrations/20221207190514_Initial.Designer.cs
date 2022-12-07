@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FeatherAndBeads.API.Migrations
 {
     [DbContext(typeof(Database))]
-    [Migration("20221204084126_added publicId to Photo")]
-    partial class addedpublicIdtoPhoto
+    [Migration("20221207190514_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -35,6 +35,15 @@ namespace FeatherAndBeads.API.Migrations
 
                     b.Property<string>("CategoryName")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("Disabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Link")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("Removed")
+                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 
