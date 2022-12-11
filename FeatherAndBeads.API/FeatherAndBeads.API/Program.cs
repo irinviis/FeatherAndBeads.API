@@ -18,14 +18,14 @@ builder.Services.AddDbContext<Database>(options =>
 
 builder.Services.AddControllers();
 
+var token = builder.Configuration.GetValue<string>("Tokenkey");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
-                builder.Configuration.GetValue<string>("Tokenkey"))),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(token)),
             ValidateIssuer = false,
             ValidateAudience = false,
         };

@@ -1,7 +1,5 @@
 ﻿using FeatherAndBeads.API.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
 
 namespace FeatherAndBeads.API
 {

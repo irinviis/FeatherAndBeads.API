@@ -27,6 +27,21 @@ namespace FeatherAndBeads.API.Controllers
         }
 
 
+        [HttpGet("GetProducts")]
+        public async Task<ActionResult> GetProducts()
+        {
+            var products = await database.Product.ToListAsync();
+            var productCategories = await database.ProductCategory.ToListAsync();
+
+            foreach (var product in products)
+            {
+                product.ProductCategories = productCategories.Where(c =>c.ProductId == product.Id).Select(c => c.CategoryId).ToList();
+            }
+
+            return Ok(products);
+        }
+
+
         [HttpGet("GetCategories")]
         public async Task<ActionResult> GetCategories()
         {
@@ -54,20 +69,19 @@ namespace FeatherAndBeads.API.Controllers
             database.Add(product);
             await database.SaveChangesAsync();
 
-            if (product.CategoryId > 0)
+            if (product.ProductCategories != null && product.ProductCategories.Any())
             {
-                var category = await database.Category.FirstOrDefaultAsync(c => c.Id == product.CategoryId);
-                if (category != null)
+                foreach (var categoryId in product.ProductCategories)
                 {
                     var productCategory = new ProductCategory
                     {
-                        CategoryId = category.Id,
+                        CategoryId = categoryId,
                         ProductId = product.Id
                     };
 
-                    database.Add(productCategory);
-                    await database.SaveChangesAsync();
+                    database.Add(productCategory);                    
                 }
+                await database.SaveChangesAsync();
             }
             return Ok();
         }
@@ -85,6 +99,18 @@ namespace FeatherAndBeads.API.Controllers
                 product.PriceWithoutTax = updatedProduct.PriceWithoutTax;
                 product.Tax = updatedProduct.Tax;
                 product.Quantity = updatedProduct.Quantity;
+
+                var existingProductCategories = database.ProductCategory.Where(p => p.ProductId == product.Id).ToList();
+                database.ProductCategory.RemoveRange(existingProductCategories);
+                
+                foreach(var selectedCategory in updatedProduct.ProductCategories)
+                {
+                    var category = new ProductCategory() { 
+                        ProductId = product.Id,
+                        CategoryId = selectedCategory
+                    };
+                    database.ProductCategory.Add(category);
+                }
                 database.SaveChanges();
             }
         }

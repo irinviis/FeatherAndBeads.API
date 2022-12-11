@@ -22,7 +22,6 @@ namespace FeatherAndBeads.API.Controllers
             //_signInManager = signInManager;
         }
 
-        [Authorize]
         [HttpGet("{userId}")]
         public async Task<ActionResult> GetUser(int userId)
         {
