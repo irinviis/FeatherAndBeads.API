@@ -1,7 +1,9 @@
 ﻿using FeatherAndBeads.API.Interfaces;
 using FeatherAndBeads.API.Models;
+using FeatherAndBeads.API.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 namespace FeatherAndBeads.API.Controllers
 {
@@ -17,11 +19,157 @@ namespace FeatherAndBeads.API.Controllers
         }
 
 
+        [HttpGet("GetCategories")]
+        public async Task<ActionResult> GetCategories()
+        {
+            var categories = await database.Category.Where(
+                c => c.Removed != true && c.Disabled != true).ToListAsync();
+
+            foreach(var category in categories)
+            {
+                category.Photo = database.Photo.FirstOrDefault(
+                    p => p.CategoryId == category.Id);
+            }
+
+            return Ok(categories);
+        }
+
+        [HttpGet("GetCategoryByLinkName")]
+        public async Task<ActionResult> GetCategoryByLinkName(string linkName)
+        {
+            var category = await database.Category.Where(
+                c => c.Removed != true && c.Disabled != true && 
+                c.Link == linkName).FirstOrDefaultAsync();
+
+            return Ok(category);
+        }
+
+
+        [HttpGet("GetCategory")]
+        public async Task<ActionResult> GetCategory(int categoryId)
+        {
+            var category = await database.Category.FirstOrDefaultAsync(
+                c => c.Id == categoryId && c.Removed != true && c.Disabled != true);  
+            
+            if(category != null)
+            {
+                category.Photo = await database.Photo.FirstOrDefaultAsync(
+                    p => p.CategoryId == categoryId);
+            }
+            return Ok(category);
+        }
+
+
+        [HttpPost("add-category")]
+        public async Task<ActionResult> AddCategory(Category category)
+        {
+            database.Add(category);
+            await database.SaveChangesAsync();
+
+            return Ok(category);
+        }
+
+        [HttpPost("update-category")]
+        public async Task UpdateCategory(Category updatedCategory)
+        {
+            var category = await database.Category.FirstOrDefaultAsync(c => c.Id == updatedCategory.Id);
+
+            if(category != null)
+            {
+                category.CategoryName = updatedCategory.CategoryName;
+                category.Link = updatedCategory.Link;
+
+                database.SaveChanges();
+            }
+        }
+
+
+        [HttpPost("upload-category-photo")]
+        public async Task<ActionResult> UploadCategoryPhoto(int categoryId, IFormFile photo)
+        {
+            var result = await photoService.AddPhotoAsync(photo);
+            if (result.Error != null)
+            {
+                return BadRequest(result.Error.Message);
+            }
+
+
+            //Removing old photo
+            var oldPhoto = await database.Photo.Where(p => p.CategoryId == categoryId).FirstOrDefaultAsync();
+            if (oldPhoto != null)
+            {
+                database.Photo.Remove(oldPhoto);
+                if (!string.IsNullOrWhiteSpace(oldPhoto.PublicId))
+                {
+                    await photoService.DeletePhotoAsync(oldPhoto.PublicId);
+                }
+            }
+
+
+            //Adding new photo
+            var categoryPhoto = new Photo()
+            {
+                CategoryId = categoryId,
+                Url = result.SecureUrl.AbsoluteUri,
+                PublicId = result.PublicId,
+            };
+
+            database.Photo.Add(categoryPhoto);
+            await database.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        [HttpPost("remove-category-photo")]
+        public async Task<ActionResult> RemoveCategoryPhoto(int photoId)
+        {
+            var photoToRemove = await database.Photo.FirstOrDefaultAsync(p => p.Id == photoId);
+            if (photoToRemove != null && photoToRemove.CategoryId > 0)
+            {
+                if (!string.IsNullOrWhiteSpace(photoToRemove.PublicId))
+                {
+                    await photoService.DeletePhotoAsync(photoToRemove.PublicId);
+                }
+
+                database.Photo.Remove(photoToRemove);
+                await database.SaveChangesAsync();
+            }
+            return Ok();
+        }
+
+
+        [HttpPost("remove-category")]
+        public async Task<ActionResult> RemoveCategory(Category category)
+        {
+            var categoryToRemove = await database.Category.FirstOrDefaultAsync(c => c.Id == category.Id);
+
+            if(categoryToRemove != null)
+            {
+                categoryToRemove.Removed = true;
+                database.SaveChanges();
+            }
+            return Ok();
+        }
+
+
+
         [HttpGet("GetProductsForCategory")]
         public async Task<ActionResult> GetProductsForCategory(int categoryId)
         {
-            var productIdsOfCategory = await database.ProductCategory.Where(pc => pc.CategoryId == categoryId).Select(pc =>pc.ProductId).ToListAsync();
-            var products = await database.Product.Where(p => productIdsOfCategory.Contains(p.Id)).ToListAsync();
+            var productIdsOfCategory = await database.ProductCategory.Where(
+                pc => pc.CategoryId == categoryId).Select(pc =>pc.ProductId).ToListAsync();
+            
+            var products = await database.Product.Where(
+                p => productIdsOfCategory.Contains(p.Id) && p.Removed != true).ToListAsync();
+
+
+            var productMainPhotos = await database.Photo.Where(
+                f => f.IsMain == true && f.ProductId > 0 && productIdsOfCategory.Contains((int)f.ProductId)).ToListAsync();
+
+            foreach(var product in products)
+            {
+                product.MainPhoto = productMainPhotos.Where(f => f.ProductId == product.Id).FirstOrDefault(p => p.IsMain == true);
+            }
 
             return Ok(products);
         }
@@ -30,24 +178,26 @@ namespace FeatherAndBeads.API.Controllers
         [HttpGet("GetProducts")]
         public async Task<ActionResult> GetProducts()
         {
-            var products = await database.Product.ToListAsync();
+            var products = await database.Product.Where(
+                p => p.Removed != true).ToListAsync();
+
+            var productIds = products.Select(p => p.Id).ToList();
+
+
             var productCategories = await database.ProductCategory.ToListAsync();
+            var photos = await database.Photo.Where(f => f.ProductId > 0 && productIds.Contains((int)f.ProductId)).ToListAsync();
 
             foreach (var product in products)
             {
-                product.ProductCategories = productCategories.Where(c =>c.ProductId == product.Id).Select(c => c.CategoryId).ToList();
-            }
+                product.ProductCategories = productCategories.Where(
+                    c => c.ProductId == product.Id).Select(c => c.CategoryId).ToList();
 
+                product.Photos = photos.Where(f => f.ProductId == product.Id).ToList();
+                product.SelectMainPhoto();
+            }
             return Ok(products);
         }
 
-
-        [HttpGet("GetCategories")]
-        public async Task<ActionResult> GetCategories()
-        {
-            var categories = await database.Category.Where(c => c.Removed != true && c.Disabled != true).ToListAsync();
-            return Ok(categories);
-        }
 
         [HttpGet("{productId}")]
         public async Task<ActionResult> GetProduct(int productId)
@@ -57,7 +207,11 @@ namespace FeatherAndBeads.API.Controllers
 
             if(product != null)
             {
-                product.Photos = await database.Photo.Where(p => p.ProductId == product.Id).ToListAsync();
+                product.ProductCategories = await database.ProductCategory.Where(
+                    pc => pc.ProductId == product.Id).Select(pc => pc.CategoryId).ToListAsync();
+
+                product.Photos = await database.Photo.Where(
+                    p => p.ProductId == product.Id).ToListAsync();
                 product.SelectMainPhoto();
             }
             return Ok(product);
@@ -153,24 +307,29 @@ namespace FeatherAndBeads.API.Controllers
         }
 
 
-        [HttpPost("add-photo")]
-        public async Task<ActionResult> AddPhoto(IFormFile file, int productId)
+        [HttpPost("upload-product-photos")]
+        public async Task<ActionResult> UploadProductPhotos(int productId, List<IFormFile> photos)
         {
-            var result = await photoService.AddPhotoAsync(file);
-            if (result.Error != null)
+            var productPhotos = new List<Photo>();            
+            foreach (var photoFile in photos)
             {
-                return BadRequest(result.Error.Message);
+                var result = await photoService.AddPhotoAsync(photoFile);
+                if (result.Error != null)
+                {
+                    return BadRequest(result.Error.Message);
+                }
+
+                var productPhoto = new Photo()
+                {
+                    ProductId = productId,
+                    Url = result.SecureUrl.AbsoluteUri,
+                    PublicId = result.PublicId,
+                    IsMain = false
+                };
+                productPhotos.Add(productPhoto);
             }
 
-            var productPhoto = new Photo()
-            {
-                ProductId = productId,
-                Url = result.SecureUrl.AbsoluteUri,
-                PublicId = result.PublicId,
-                IsMain = false
-            };
-
-            database.Photo.Add(productPhoto);
+            database.Photo.AddRange(productPhotos);
             await database.SaveChangesAsync();
 
             var productHasMainPhoto = await database.Photo.Where(
@@ -181,27 +340,34 @@ namespace FeatherAndBeads.API.Controllers
             }
             return Ok();
         }
+       
 
         [HttpPost("set-main-photo")]
         public async Task<ActionResult> SetMainPhoto(int photoId, int productId)
         {
-            await SetProductMainPhoto(photoId, productId);
+            await SetProductMainPhoto(productId, photoId);
             return Ok();
         }
 
         [HttpPost("remove-photo")]
         public async Task<ActionResult> RemovePhoto(int photoId)
         {
-            var photoToRemove = await database.Photo.FirstOrDefaultAsync(
-                p => p.Id == photoId);
-            if (photoToRemove != null)
+            var photoToRemove = await database.Photo.FirstOrDefaultAsync(p => p.Id == photoId);
+            if (photoToRemove != null && photoToRemove.ProductId > 0)
             {
-                database.Photo.Remove(photoToRemove);
-                database.SaveChanges();
+                if (!string.IsNullOrWhiteSpace(photoToRemove.PublicId))
+                {
+                    await photoService.DeletePhotoAsync(photoToRemove.PublicId);
+                }
 
-                SetProductMainPhoto(photoToRemove.ProductId);
+                database.Photo.Remove(photoToRemove);
+                await database.SaveChangesAsync();
+
+                await SetProductMainPhoto((int)photoToRemove.ProductId);
             }
             return Ok();
         }
+
+        
     }
 }

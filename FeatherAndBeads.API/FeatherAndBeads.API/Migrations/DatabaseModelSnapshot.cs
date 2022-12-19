@@ -105,10 +105,13 @@ namespace FeatherAndBeads.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsMain")
                         .HasColumnType("bit");
 
-                    b.Property<int>("ProductId")
+                    b.Property<int?>("ProductId")
                         .HasColumnType("int");
 
                     b.Property<string>("PublicId")
@@ -118,6 +121,10 @@ namespace FeatherAndBeads.API.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryId")
+                        .IsUnique()
+                        .HasFilter("[CategoryId] IS NOT NULL");
 
                     b.HasIndex("ProductId");
 
@@ -257,11 +264,18 @@ namespace FeatherAndBeads.API.Migrations
 
             modelBuilder.Entity("FeatherAndBeads.API.Models.Photo", b =>
                 {
+                    b.HasOne("FeatherAndBeads.API.Models.Category", null)
+                        .WithOne("Photo")
+                        .HasForeignKey("FeatherAndBeads.API.Models.Photo", "CategoryId");
+
                     b.HasOne("FeatherAndBeads.API.Models.Product", null)
                         .WithMany("Photos")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ProductId");
+                });
+
+            modelBuilder.Entity("FeatherAndBeads.API.Models.Category", b =>
+                {
+                    b.Navigation("Photo");
                 });
 
             modelBuilder.Entity("FeatherAndBeads.API.Models.Product", b =>

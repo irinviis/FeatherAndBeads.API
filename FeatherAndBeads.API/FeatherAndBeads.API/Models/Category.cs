@@ -7,5 +7,6 @@
         public bool? Disabled { get; set; }
         public bool? Removed { get; set; }
         public string? Link { get; set; }
+        public Photo? Photo { get; set; }
     }
 }
