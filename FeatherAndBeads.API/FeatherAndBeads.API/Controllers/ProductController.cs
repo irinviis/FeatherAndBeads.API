@@ -1,9 +1,7 @@
 ﻿using FeatherAndBeads.API.Interfaces;
 using FeatherAndBeads.API.Models;
-using FeatherAndBeads.API.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
 
 namespace FeatherAndBeads.API.Controllers
 {
@@ -25,7 +23,7 @@ namespace FeatherAndBeads.API.Controllers
             var categories = await database.Category.Where(
                 c => c.Removed != true && c.Disabled != true).ToListAsync();
 
-            foreach(var category in categories)
+            foreach (var category in categories)
             {
                 category.Photo = database.Photo.FirstOrDefault(
                     p => p.CategoryId == category.Id);
@@ -38,7 +36,7 @@ namespace FeatherAndBeads.API.Controllers
         public async Task<ActionResult> GetCategoryByLinkName(string linkName)
         {
             var category = await database.Category.Where(
-                c => c.Removed != true && c.Disabled != true && 
+                c => c.Removed != true && c.Disabled != true &&
                 c.Link == linkName).FirstOrDefaultAsync();
 
             return Ok(category);
@@ -49,9 +47,9 @@ namespace FeatherAndBeads.API.Controllers
         public async Task<ActionResult> GetCategory(int categoryId)
         {
             var category = await database.Category.FirstOrDefaultAsync(
-                c => c.Id == categoryId && c.Removed != true && c.Disabled != true);  
-            
-            if(category != null)
+                c => c.Id == categoryId && c.Removed != true && c.Disabled != true);
+
+            if (category != null)
             {
                 category.Photo = await database.Photo.FirstOrDefaultAsync(
                     p => p.CategoryId == categoryId);
@@ -74,7 +72,7 @@ namespace FeatherAndBeads.API.Controllers
         {
             var category = await database.Category.FirstOrDefaultAsync(c => c.Id == updatedCategory.Id);
 
-            if(category != null)
+            if (category != null)
             {
                 category.CategoryName = updatedCategory.CategoryName;
                 category.Link = updatedCategory.Link;
@@ -143,7 +141,7 @@ namespace FeatherAndBeads.API.Controllers
         {
             var categoryToRemove = await database.Category.FirstOrDefaultAsync(c => c.Id == category.Id);
 
-            if(categoryToRemove != null)
+            if (categoryToRemove != null)
             {
                 categoryToRemove.Removed = true;
                 database.SaveChanges();
@@ -157,16 +155,16 @@ namespace FeatherAndBeads.API.Controllers
         public async Task<ActionResult> GetProductsForCategory(int categoryId)
         {
             var productIdsOfCategory = await database.ProductCategory.Where(
-                pc => pc.CategoryId == categoryId).Select(pc =>pc.ProductId).ToListAsync();
-            
+                pc => pc.CategoryId == categoryId).Select(pc => pc.ProductId).ToListAsync();
+
             var products = await database.Product.Where(
-                p => productIdsOfCategory.Contains(p.Id) && p.Removed != true).ToListAsync();
+                p => productIdsOfCategory.Contains(p.Id) && p.Quantity > 0 && p.Removed != true).ToListAsync();
 
 
             var productMainPhotos = await database.Photo.Where(
                 f => f.IsMain == true && f.ProductId > 0 && productIdsOfCategory.Contains((int)f.ProductId)).ToListAsync();
 
-            foreach(var product in products)
+            foreach (var product in products)
             {
                 product.MainPhoto = productMainPhotos.Where(f => f.ProductId == product.Id).FirstOrDefault(p => p.IsMain == true);
             }
@@ -178,8 +176,7 @@ namespace FeatherAndBeads.API.Controllers
         [HttpGet("GetProducts")]
         public async Task<ActionResult> GetProducts()
         {
-            var products = await database.Product.Where(
-                p => p.Removed != true).ToListAsync();
+            var products = await database.Product.ToListAsync();
 
             var productIds = products.Select(p => p.Id).ToList();
 
@@ -200,12 +197,12 @@ namespace FeatherAndBeads.API.Controllers
 
 
         [HttpGet("{productId}")]
-        public async Task<ActionResult> GetProduct(int productId)
+        public async Task<ActionResult> GetProduct(int productId, bool includeRemoved = false)
         {
             var product = await database.Product.FirstOrDefaultAsync(
-                p => p.Id == productId && p.Removed != true);
+                p => p.Id == productId && p.Removed == includeRemoved);
 
-            if(product != null)
+            if (product != null)
             {
                 product.ProductCategories = await database.ProductCategory.Where(
                     pc => pc.ProductId == product.Id).Select(pc => pc.CategoryId).ToListAsync();
@@ -216,6 +213,21 @@ namespace FeatherAndBeads.API.Controllers
             }
             return Ok(product);
         }
+
+
+        [HttpGet("getProductSaldo")]
+        public async Task<ActionResult> GetProductSaldo(int productId)
+        {
+            var product = await database.Product.FirstOrDefaultAsync(
+                p => p.Id == productId && p.Removed != true);
+
+            if (product != null)
+            {
+                return Ok(product.Quantity);
+            }
+            return Ok(0);
+        }
+
 
         [HttpPost("add-product")]
         public async Task<ActionResult> AddProduct(Product product)
@@ -233,7 +245,7 @@ namespace FeatherAndBeads.API.Controllers
                         ProductId = product.Id
                     };
 
-                    database.Add(productCategory);                    
+                    database.Add(productCategory);
                 }
                 await database.SaveChangesAsync();
             }
@@ -249,17 +261,20 @@ namespace FeatherAndBeads.API.Controllers
             if (product != null)
             {
                 product.Name = updatedProduct.Name;
-                product.Description = updatedProduct.Description;
+                product.ShortDescription = updatedProduct.ShortDescription;
+                product.LongDescription = updatedProduct.LongDescription;
+                product.PriceWithTax = updatedProduct.PriceWithTax;
                 product.PriceWithoutTax = updatedProduct.PriceWithoutTax;
                 product.Tax = updatedProduct.Tax;
                 product.Quantity = updatedProduct.Quantity;
 
                 var existingProductCategories = database.ProductCategory.Where(p => p.ProductId == product.Id).ToList();
                 database.ProductCategory.RemoveRange(existingProductCategories);
-                
-                foreach(var selectedCategory in updatedProduct.ProductCategories)
+
+                foreach (var selectedCategory in updatedProduct.ProductCategories)
                 {
-                    var category = new ProductCategory() { 
+                    var category = new ProductCategory()
+                    {
                         ProductId = product.Id,
                         CategoryId = selectedCategory
                     };
@@ -272,11 +287,24 @@ namespace FeatherAndBeads.API.Controllers
         [HttpPost("remove-product")]
         public async Task<ActionResult> RemoveProduct(Product product)
         {
-            var productToRemove =  await database.Product.FirstOrDefaultAsync(p => p.Id == product.Id);
+            var productToRemove = await database.Product.FirstOrDefaultAsync(p => p.Id == product.Id);
 
             if (productToRemove != null)
             {
                 productToRemove.Removed = true;
+                database.SaveChanges();
+            }
+            return Ok();
+        }
+
+        [HttpPost("return-product")]
+        public async Task<ActionResult> ReturnProduct(Product product)
+        {
+            var productToReturn = await database.Product.FirstOrDefaultAsync(p => p.Id == product.Id);
+
+            if (productToReturn != null)
+            {
+                productToReturn.Removed = false;
                 database.SaveChanges();
             }
             return Ok();
@@ -310,7 +338,7 @@ namespace FeatherAndBeads.API.Controllers
         [HttpPost("upload-product-photos")]
         public async Task<ActionResult> UploadProductPhotos(int productId, List<IFormFile> photos)
         {
-            var productPhotos = new List<Photo>();            
+            var productPhotos = new List<Photo>();
             foreach (var photoFile in photos)
             {
                 var result = await photoService.AddPhotoAsync(photoFile);
@@ -340,7 +368,7 @@ namespace FeatherAndBeads.API.Controllers
             }
             return Ok();
         }
-       
+
 
         [HttpPost("set-main-photo")]
         public async Task<ActionResult> SetMainPhoto(int photoId, int productId)
@@ -368,6 +396,6 @@ namespace FeatherAndBeads.API.Controllers
             return Ok();
         }
 
-        
+
     }
 }

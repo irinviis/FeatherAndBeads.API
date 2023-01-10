@@ -4,6 +4,7 @@ using FeatherAndBeads.API;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FeatherAndBeads.API.Migrations
 {
     [DbContext(typeof(Database))]
-    partial class DatabaseModelSnapshot : ModelSnapshot
+    [Migration("20221219163114_Changed PriceWithTax to Product")]
+    partial class ChangedPriceWithTaxtoProduct
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -139,7 +142,7 @@ namespace FeatherAndBeads.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("LongDescription")
+                    b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
@@ -148,17 +151,11 @@ namespace FeatherAndBeads.API.Migrations
                     b.Property<double>("PriceWithTax")
                         .HasColumnType("float");
 
-                    b.Property<double>("PriceWithoutTax")
-                        .HasColumnType("float");
-
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
                     b.Property<bool>("Removed")
                         .HasColumnType("bit");
-
-                    b.Property<string>("ShortDescription")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<double>("Tax")
                         .HasColumnType("float");

@@ -26,8 +26,7 @@ namespace FeatherAndBeads.API.Services
                 using var stream = file.OpenReadStream();
                 var uploadParams = new ImageUploadParams
                 {
-                    File = new FileDescription(file.FileName, stream),
-                    Transformation = new Transformation().Height(500).Width(500).Crop("fill").Gravity("face")
+                    File = new FileDescription(file.FileName, stream)
                 };
                 uploadResult = await cloudinary.UploadAsync(uploadParams);
             }

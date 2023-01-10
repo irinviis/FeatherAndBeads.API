@@ -8,14 +8,21 @@ namespace FeatherAndBeads.API.Models
 
         public string? Name { get; set; }
 
-        public string? Description { get; set; }
+        public string? ShortDescription { get; set; }
+
+        public string? LongDescription { get; set; }
 
         [NotMapped]
         public Photo? MainPhoto { get; set; }
 
+        public double PriceWithTax { get; set; }
+
         public double PriceWithoutTax { get; set; }
 
         public double Tax { get; set; }
+
+        [NotMapped]
+        public int CartQuantity { get; set; } = 1;
 
         public int Quantity { get; set; }
 
